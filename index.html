@@ -8,19 +8,33 @@
 </head>
 <body>
     <h1>Calculadora de subredes</h1>
-    (Solo para máscaras de 24 bits)
     <div>
     <form id="calc-form">
-        <label class="form-contents" for="IPnumber">Dirección IP: </label>
-        <input class="form-contents" type="text" name="IPnumber" id="IPnumber" pattern="([0-9]{1,3}[.]){3}([0-9]{1,3})" required>
+        <div class="form-contents">
+            <label for="CIDR">CIDR: </label>
+            <select name="CIDR" id="CIDR">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+            </select>
+        </div>
+        <div class="form-contents">
+            <label for="IPnumber">Dirección IP: </label>
+            <input type="text" name="IPnumber" id="IPnumber" pattern="([0-9]{1,3}[.]){3}([0-9]{1,3})" required>
+        </div>
         <br>
-        <label class="form-contents" for="SNnumber">Número minimo de subredes requeridas: </label>
-        <input class="form-contents" type="number" id="SNnumber" name="SNnumber" required>
+        <div class="form-contents">
+                <label for="maskNumber">Máscara de subred: </label>
+                <select name="maskNumber" id="maskNumber">
+                </select>
+        </div>
         <br>
-        <button id="calc-button" type="submit">Calc</button>
+        <div class="form-contents">
+            <button id="calc-mask" type="submit">Calcular</button>
+        </div>
     </form>
     <div id="answer">
-
+        
     </div>
 </div>
     <script src="main.js"></script>
