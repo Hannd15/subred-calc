@@ -1,15 +1,8 @@
-const form = document.getElementById('calc-form')
-const answerDiv = document.getElementById('answer')
-const maskSelect = document.getElementById('maskNumber')
-const selectCIDR = document.getElementById('CIDR')
-
-const TOTAL_OCTATES = 4
-const MAX_NET_BITS = 30
 const WHOLE_BYTE = 255
-let netOct
-let hostOct
+const MAX_NET_BITS = 30
+const OCTATE_SIZE = 8
 
-const Answer=(title, content)=>{
+const Answer=(title, content,answerDiv)=>{
     answerDiv.insertAdjacentHTML ('beforeend',
         `<div class="answer-section">
         <strong>${title}:</strong>
@@ -19,116 +12,186 @@ const Answer=(title, content)=>{
     )
 }
 
-const ipCheck = (ip)=>{
-    const hostOct = TOTAL_OCTATES - netOct
-    for (i of ip){
-        if (i<=WHOLE_BYTE){
-            continue;
-        } else {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-const cidrCheck =(ip,CIDR)=>{
-    switch (CIDR) {
-        case "A":
-            if (ip[0]<127){
-                netOct = 1
-                break
-            }else{
-                alert("Las redes tipo A no pueden tener ese número de red")
-                return 1
-            }
-        case "B":
-            if (ip[0]<191 && ip[0]>128){
-                netOct = 2
-                break
-            }else{
-                alert("Las redes tipo B no pueden tener ese número de red")
-                return 1
-            }
-        case "C":
-            if (ip[0]<223 && ip[0]>192){
-                netOct = 3
-                break
-            }else{
-                alert("Las redes tipo C no pueden tener ese número de red")
-                return 1
-            }
-    }
-    return 0
-}
-
-const updateMasks = (netBits)=>{
+const updateMasks = (netBits, maskSelect)=>{
     maskSelect.innerHTML=''
     for (let i = netBits; i <= MAX_NET_BITS; i++) {
         maskSelect.insertAdjacentHTML('beforeend',`<option value="${i}">${i}</option>`)
     }
 }
 
-updateMasks(8)
-
-selectCIDR.addEventListener('change',(e)=>{
-    switch (e.target.value) {
+function fillMasks() {
+    const select = document.getElementById('maskNumber')
+    switch (document.getElementById('CIDR').value) {
         case "A":
-            updateMasks(8)
+            updateMasks(8, select)
             break;
         case "B":
-            updateMasks(16)
+            updateMasks(16, select)
             break;
         case "C":
-            updateMasks(24)
+            updateMasks(24, select)
             break;
         default:
             break;
     }
+}
+
+fillMasks()
+
+document.getElementById('CIDR').addEventListener('change',()=>{
+    fillMasks()
 })
 
-form.addEventListener('submit',(e)=>{
-    e.preventDefault()
-    answerDiv.innerHTML=''
-    const network = e.target.IPnumber.value.split('.')
-    const CIDR = e.target.CIDR.value
-    const subNetMask = e.target.maskNumber.value
-    const netMask = []
-
-    err = ipCheck(network)
-    err = cidrCheck(network,CIDR)
-
-    if (!err){
-        netOct=Math.floor(subNetMask/8)
-        hostOct=TOTAL_OCTATES-netOct
-        const magicNumber = WHOLE_BYTE>>(subNetMask%8)
-        const extraBits = WHOLE_BYTE-magicNumber
-        for (i=0;i<netOct;i++){
-            netMask.push(WHOLE_BYTE)
-        }
-        for (i=0;i<hostOct;i++){
-            netMask.push(i===0?(extraBits):0)
-        }
-
-        answerDiv.style.visibility='visible'
-        Answer('Máscara de subred',netMask.join('.'))
-        
-        const netAddress = []
-        for(i=0;i<TOTAL_OCTATES;i++){
-            if (netMask[i] && netMask[i]===WHOLE_BYTE){
-                netAddress.push(network[i])
-            }else{
-                netAddress.push(0)
-            }
-        }
-        Answer('Dirección de subred',netAddress.join('.'))
-
-        const firstUsableAddress = []
-        const lastUsableAddress = []
-        for (i=0;i<netOct;i++){
-            firstUsableAddress.push(netAddress[i])
-            lastUsableAddress.push(netAddress[i])
-        }
-
-        Answer('Rango de hosts usables',`${firstUsableAddress.join('.')} - ${lastUsableAddress.join('.')}`)
+function fillNetMask(CIDR,extraBits,magicNumber) {
+    const subNetMask = []
+    for (i=0;i<Math.floor(CIDR/OCTATE_SIZE);i++){
+        subNetMask.push(WHOLE_BYTE)
     }
+    while (subNetMask.length<4){
+        if (extraBits>OCTATE_SIZE){
+            subNetMask.push(WHOLE_BYTE)
+            extraBits-=OCTATE_SIZE
+        }else if (extraBits){
+            subNetMask.push(WHOLE_BYTE-magicNumber)
+            extraBits = 0
+        }else if (!extraBits) {
+            subNetMask.push(0)            
+        }
+    }
+    return subNetMask
+}
+
+function bitsToOctates(bits) {
+    return [Math.floor(bits/OCTATE_SIZE), bits%OCTATE_SIZE]
+}
+
+function fillNetAddr(defOct,ip,magicNumber){
+    const netAddr = []
+    for (i=0;i<defOct;i++){
+        netAddr.push(ip[i])
+    }
+    netAddr.push(0)
+    while (ip[defOct]>(netAddr[defOct]+magicNumber+1)) {
+        netAddr[defOct] += magicNumber+1
+    }
+    while (netAddr.length<4){
+        netAddr.push(0)
+    }
+    return netAddr
+}
+
+function getNetAddrRange(start, defOct,magicNumber) {
+    const endingIP = []
+    const startingIP = structuredClone(start)
+    startingIP[3]+=1
+    for (i=0;i<4;i++){
+        if (i<defOct){
+            endingIP.push(start[i])
+        }else if (i==defOct){
+            endingIP.push(startingIP[i]+magicNumber)
+        }else{
+            endingIP.push(WHOLE_BYTE)
+        }
+    }
+    if (endingIP[3]==255){
+        endingIP[3]-=1
+    }else{
+        endingIP[3]-=2
+    }
+    return [startingIP,endingIP]
+}
+
+function getBroadcastAddr(lastAddr) {
+    const broadcast = structuredClone(lastAddr)
+    broadcast[3]+=1
+    return broadcast
+}
+
+function getPossibleNet(ip,possibleSubNets,startingOctates,magicNumber) {
+    const possibleAddresses = []
+    let buffAddress = []
+    for (i=0;i<4;i++){
+        if(i<startingOctates){
+            buffAddress.push(ip[i])
+        }else{
+            buffAddress.push(0)
+        }
+    }
+    for (j=0;j<possibleSubNets;j++){
+        const range = structuredClone(getNetAddrRange(buffAddress,startingOctates,magicNumber))
+        possibleAddresses.push(range)
+        buffAddress=range[1].map((x)=>{
+            if (x==255 || x == 254){
+                return 0
+            }else{
+                return x
+            }
+        })
+        buffAddress[startingOctates]+=1
+    }
+    return possibleAddresses
+}
+
+
+
+document.getElementById('calc-form').addEventListener('submit',(e)=>{
+    e.preventDefault()
+    const ip = document.getElementById('IPnumber').value.split('.')
+    const ipClass = document.getElementById('CIDR').value
+    const answerDiv = document.getElementById('answer')
+
+    answerDiv.innerHTML=''
+
+    let defCIDR
+    switch (ipClass) {
+        case "A":
+            defCIDR = OCTATE_SIZE
+            break;
+        case "B":
+            defCIDR = OCTATE_SIZE * 2
+            break;
+        case "C":
+            defCIDR = OCTATE_SIZE * 3
+            break;
+        default:
+            break;
+    }
+
+    const inCIDR = document.getElementById('maskNumber').value
+
+    let extraBits = inCIDR-defCIDR
+    const magicNumber = WHOLE_BYTE>>(extraBits%OCTATE_SIZE)
+    const possibleSubNets = 2**(extraBits%OCTATE_SIZE)
+
+    const startingOctates = bitsToOctates(inCIDR)[0]
+
+    const NetworkAddress = fillNetAddr(startingOctates,ip,magicNumber)
+    const UsableHostsRange = getNetAddrRange(NetworkAddress,startingOctates,magicNumber)
+    const BroadcastAddress = getBroadcastAddr(UsableHostsRange[1])
+    const NetworkMask = fillNetMask(defCIDR,extraBits,magicNumber)
+    const PossibleSubNets = getPossibleNet(ip, possibleSubNets, startingOctates,magicNumber)
+
+    Answer('Dirección IP',ip.join('.'),answerDiv)
+    Answer('Dirección de red',NetworkAddress.join('.'),answerDiv)
+    Answer('Rango de hosts usables',UsableHostsRange.map((i)=>i.join('.')).join('-'),answerDiv)
+    Answer('Broadcast',BroadcastAddress.join('.'),answerDiv)
+    Answer('Máscara de subnet',NetworkMask.join('.'),answerDiv)
+
+    console.log(PossibleSubNets);
+    
+    answerDiv.insertAdjacentHTML('beforeend',`
+    <div class="answer-section">
+        <strong>Posibles Subnets:</strong>
+        <br>
+        ${PossibleSubNets.map((r)=>{
+            return (
+                r.map((i)=>{
+                    return i.join('.')
+                })
+            ).join('-')+'<br>'
+        }).join('')}
+    </div>`)
+
+    answerDiv.style.visibility='visible'
+
 })

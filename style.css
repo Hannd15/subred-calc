@@ -27,15 +27,15 @@ h1{
 #answer{
     margin-top: 15px;
     visibility: hidden;
+    align-items: center;
+    justify-content: center;
     padding: 10px;
-    display: flex;
     background-color: bisque;
     border-radius: 15px;
 }
 
 .answer-section{
     padding: 15px;
-    width: 25%;
     margin: 5px;
     display: flex;
     background-color: rgb(209, 209, 209);
